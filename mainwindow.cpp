@@ -31,6 +31,7 @@ MainWindow::MainWindow(QWidget *parent)
     ui->comboBox->addItem("Get Leds", 0xFB);
 
     ui->encodeData->setEnabled(false);
+    ui->plainTextEdit->setVisible(false);
 
     ui->toolBar->addAction("Debugging");
 //    ui->addWidget(QToolButton);
@@ -54,26 +55,6 @@ void MainWindow::onQTimer1(){
     }
 }
 
-//'<' header
-//byte1
-//byte2
-//byte3
-//byte4
-//checksum = suma de todos los bytes transmitidos
-//'>' tail
-
-//  4      1      1    1    N     1
-//HEADER NBYTES TOKEN ID PAYLOAD CKS
-
-//HEADER 4 bytes
-//'U' 'N' 'E' 'R'
-
-//NBYTES = ID+PAYLOAD+CKS = 2 + nbytes de payload
-
-//TOKEN: ':'
-
-//CKS: xor de todos los bytes enviados menos el CKS
-
 void MainWindow::on_pushButton_3_clicked(){
     if(QSerialPort1->isOpen()){
         QSerialPort1->close();
@@ -85,7 +66,7 @@ void MainWindow::on_pushButton_3_clicked(){
             ui->encodeData->setEnabled(true);
             ui->pushButton_3->setText("CLOSE");
             //Pregunto version del firmware
-            ID = FIRMWARE;
+            ID = GET_LEDS;
             length = 0;
             sendData();
         }else{
@@ -198,16 +179,23 @@ void MainWindow::decodeData(){
         ledSelect = myWord.ui32;
         strRxProcess = QString("%1").arg(myWord.ui32, 2, 16, QChar('0')).toUpper();
         ui->plainTextEdit->appendPlainText(strRxProcess);
-        ledsPrint();
+        leds_botons_Print();
         break;
 
-    case GET_BOTONES:
-        myWord.ui16[0] = bufRX[1];
-        myWord.ui16[1] = bufRX[2];
-        botonSelect = myWord.ui32;
+    case CHANGE_BOTONES:
+        botones.numButton = bufRX[1];
+        botones.flanco = bufRX[2];
+
+        myWord.ui8[0] = bufRX[3];
+        myWord.ui8[0] = bufRX[4];
+        myWord.ui8[0] = bufRX[5];
+        myWord.ui8[0] = bufRX[6];
+        botones.timerRead = myWord.ui32;
+
+        ui->lcdNumber->display(QString("%1").arg(botones.timerRead, 2, 10, QChar('0')));
         strRxProcess = QString("%1").arg(myWord.ui32, 2, 16, QChar('0')).toUpper();
         ui->plainTextEdit->appendPlainText(strRxProcess);
-        ledsPrint();
+        leds_botons_Print();
     }
 }
 
@@ -285,7 +273,7 @@ void MainWindow::on_checkBox_3_toggled(bool checked)
         ui->plainTextEdit->setVisible(false);
 }
 
-void MainWindow::ledsPrint()
+void MainWindow::leds_botons_Print()
 {
     QPen pen;
     QBrush brush;
@@ -304,30 +292,34 @@ void MainWindow::ledsPrint()
     paint.setBrush(brush);
     paint.drawRect(0,0,w,h);
 
+    int ledHigh = h*1/4-radio;
     font.setPixelSize(20);
     paint.setFont(font);
     pen.setWidth(3);
     pen.setColor(Qt::white);
     paint.setPen(pen);
-    paint.drawText(w*4/5-radio-10,h/4-radio-10, "LED_4");
-    paint.drawText(w*3/5-radio-10,h/4-radio-10, "LED_3");
-    paint.drawText(w*2/5-radio-10,h/4-radio-10, "LED_2");
-    paint.drawText(w*1/5-radio-10,h/4-radio-10, "LED_1");
+    paint.drawText(w*4/5-radio-10,ledHigh-radio-10, "LED_4");
+    paint.drawText(w*3/5-radio-10,ledHigh-radio-10, "LED_3");
+    paint.drawText(w*2/5-radio-10,ledHigh-radio-10, "LED_2");
+    paint.drawText(w*1/5-radio-10,ledHigh-radio-10, "LED_1");
 
-    int ledHigh = h*1/4-radio;
+    QColor contornoLed = Qt::black;
+    QColor ledOff = Qt::gray;
+    QColor ledOn = Qt::blue;
+
     if (ledSelect & 0x01){
-        pen.setWidth(3);
-        pen.setColor(Qt::gray);
+        pen.setWidth(2);
+        pen.setColor(contornoLed);
         paint.setPen(pen);
-        brush.setColor(Qt::green);
+        brush.setColor(ledOn);
         brush.setStyle(Qt::SolidPattern);
         paint.setBrush(brush);
         paint.drawEllipse(w*4/5-radio, ledHigh, 2*radio, 2*radio);
     }else {
         pen.setWidth(3);
-        pen.setColor(Qt::gray);
+        pen.setColor(contornoLed);
         paint.setPen(pen);
-        brush.setColor(Qt::gray);
+        brush.setColor(ledOff);
         brush.setStyle(Qt::SolidPattern);
         paint.setBrush(brush);
         paint.drawEllipse(w*4/5-radio, ledHigh, 2*radio, 2*radio);
@@ -335,17 +327,17 @@ void MainWindow::ledsPrint()
 
     if (ledSelect & 0x02){
         pen.setWidth(3);
-        pen.setColor(Qt::gray);
+        pen.setColor(contornoLed);
         paint.setPen(pen);
-        brush.setColor(Qt::green);
+        brush.setColor(ledOn);
         brush.setStyle(Qt::SolidPattern);
         paint.setBrush(brush);
         paint.drawEllipse(w*3/5-radio, ledHigh, 2*radio, 2*radio);
     }else {
         pen.setWidth(3);
-        pen.setColor(Qt::gray);
+        pen.setColor(contornoLed);
         paint.setPen(pen);
-        brush.setColor(Qt::gray);
+        brush.setColor(ledOff);
         brush.setStyle(Qt::SolidPattern);
         paint.setBrush(brush);
         paint.drawEllipse(w*3/5-radio, ledHigh, 2*radio, 2*radio);
@@ -353,17 +345,17 @@ void MainWindow::ledsPrint()
 
     if (ledSelect & 0x04){
         pen.setWidth(3);
-        pen.setColor(Qt::gray);
+        pen.setColor(contornoLed);
         paint.setPen(pen);
-        brush.setColor(Qt::green);
+        brush.setColor(ledOn);
         brush.setStyle(Qt::SolidPattern);
         paint.setBrush(brush);
         paint.drawEllipse(w*2/5-radio, ledHigh, 2*radio, 2*radio);
     }else{
         pen.setWidth(3);
-        pen.setColor(Qt::gray);
+        pen.setColor(contornoLed);
         paint.setPen(pen);
-        brush.setColor(Qt::gray);
+        brush.setColor(ledOff);
         brush.setStyle(Qt::SolidPattern);
         paint.setBrush(brush);
         paint.drawEllipse(w*2/5-radio, ledHigh, 2*radio, 2*radio);
@@ -372,17 +364,17 @@ void MainWindow::ledsPrint()
     if (ledSelect & 0x08)
     {
         pen.setWidth(3);
-        pen.setColor(Qt::gray);
+        pen.setColor(contornoLed);
         paint.setPen(pen);
-        brush.setColor(Qt::green);
+        brush.setColor(ledOn);
         brush.setStyle(Qt::SolidPattern);
         paint.setBrush(brush);
         paint.drawEllipse(w/5-radio, ledHigh, 2*radio, 2*radio);
     }else {
         pen.setWidth(3);
-        pen.setColor(Qt::gray);
+        pen.setColor(contornoLed);
         paint.setPen(pen);
-        brush.setColor(Qt::gray);
+        brush.setColor(ledOff);
         brush.setStyle(Qt::SolidPattern);
         paint.setBrush(brush);
         paint.drawEllipse(w/5-radio, ledHigh, 2*radio, 2*radio);
@@ -390,149 +382,165 @@ void MainWindow::ledsPrint()
 
     int botonHigh = h*3/4-radio;
 
+    font.setPixelSize(20);
+    paint.setFont(font);
+    pen.setWidth(3);
+    pen.setColor(Qt::white);
+    paint.setPen(pen);
+    paint.drawText(w*4/5-radio-15,botonHigh-radio-10, "Boton_4");
+    paint.drawText(w*3/5-radio-15,botonHigh-radio-10, "Boton_3");
+    paint.drawText(w*2/5-radio-15,botonHigh-radio-10, "Boton_2");
+    paint.drawText(w*1/5-radio-15,botonHigh-radio-10, "Boton_1");
     //    paint.drawRoundedRect(w*4/5-radio,h/2-radio,20,20,40);
-    if (botonSelect & 0x01){
+
+    QColor contorno = Qt::black;
+    QColor fondoNotPress = Qt::gray;
+    QColor fondoPress = Qt::darkGray;
+    QColor circuloNotPress = Qt::gray;
+    QColor circuloPress = Qt::darkRed;
+
+    if (botones.numButton & 0x01){
         //Set & Draw cuadrado
         pen.setWidth(3);
-        pen.setColor(Qt::black);
+        pen.setColor(contorno);
         paint.setPen(pen);
-        brush.setColor(Qt::darkGray);
+        brush.setColor(fondoPress);
         brush.setStyle(Qt::SolidPattern);
         paint.setBrush(brush);
-        paint.drawRect(w*4/5-radio,botonHigh,60,60);
+        paint.drawRect(w*4/5-30,botonHigh,60,60);
         //Set & Draw circulo
         pen.setWidth(3);
-        pen.setColor(Qt::black);
+        pen.setColor(contorno);
         paint.setPen(pen);
-        brush.setColor(Qt::gray);
+        brush.setColor(circuloPress);
         brush.setStyle(Qt::SolidPattern);
         paint.setBrush(brush);
-        paint.drawEllipse(w*4/5-5,botonHigh+15,30,30);
+        paint.drawEllipse(w*4/5-15,botonHigh+15,30,30);
     }else{
         //Set & Draw cuadrado
         pen.setWidth(3);
-        pen.setColor(Qt::black);
+        pen.setColor(contorno);
         paint.setPen(pen);
-        brush.setColor(Qt::gray);
+        brush.setColor(fondoNotPress);
         brush.setStyle(Qt::SolidPattern);
         paint.setBrush(brush);
-        paint.drawRect(w*4/5-radio,botonHigh,60,60);
+        paint.drawRect(w*4/5-30,botonHigh,60,60);
         //Set & Draw circulo
         pen.setWidth(3);
-        pen.setColor(Qt::black);
+        pen.setColor(contorno);
         paint.setPen(pen);
-        brush.setColor(Qt::darkGray);
+        brush.setColor(circuloNotPress);
         brush.setStyle(Qt::SolidPattern);
         paint.setBrush(brush);
-        paint.drawEllipse(w*4/5-5,botonHigh+15,30,30);
+        paint.drawEllipse(w*4/5-15,botonHigh+15,30,30);
     }
 
-    if (botonSelect & 0x02){
+    if (botones.numButton & 0x02){
         //Set & Draw cuadrado
         pen.setWidth(3);
-        pen.setColor(Qt::black);
+        pen.setColor(contorno);
         paint.setPen(pen);
-        brush.setColor(Qt::darkGray);
+        brush.setColor(fondoPress);
         brush.setStyle(Qt::SolidPattern);
         paint.setBrush(brush);
-        paint.drawRect(w*3/5-radio,botonHigh,60,60);
+        paint.drawRect(w*3/5-30,botonHigh,60,60);
         //Set & Draw circulo
         pen.setWidth(3);
-        pen.setColor(Qt::black);
+        pen.setColor(contorno);
         paint.setPen(pen);
-        brush.setColor(Qt::gray);
+        brush.setColor(circuloPress);
         brush.setStyle(Qt::SolidPattern);
         paint.setBrush(brush);
-        paint.drawEllipse(w*3/5-5,botonHigh+15,30,30);
+        paint.drawEllipse(w*3/5-15,botonHigh+15,30,30);
     }else{
         //Set & Draw cuadrado
         pen.setWidth(3);
-        pen.setColor(Qt::black);
+        pen.setColor(contorno);
         paint.setPen(pen);
-        brush.setColor(Qt::gray);
+        brush.setColor(fondoNotPress);
         brush.setStyle(Qt::SolidPattern);
         paint.setBrush(brush);
-        paint.drawRect(w*3/5-radio,botonHigh,60,60);
+        paint.drawRect(w*3/5-30,botonHigh,60,60);
         //Set & Draw circulo
         pen.setWidth(3);
-        pen.setColor(Qt::black);
+        pen.setColor(contorno);
         paint.setPen(pen);
-        brush.setColor(Qt::darkGray);
+        brush.setColor(circuloNotPress);
         brush.setStyle(Qt::SolidPattern);
         paint.setBrush(brush);
-        paint.drawEllipse(w*3/5-5,botonHigh+15,30,30);
+        paint.drawEllipse(w*3/5-15,botonHigh+15,30,30);
     }
 
-    if (botonSelect & 0x04){
+    if (botones.numButton & 0x04){
         //Set & Draw cuadrado
         pen.setWidth(3);
-        pen.setColor(Qt::black);
+        pen.setColor(contorno);
         paint.setPen(pen);
-        brush.setColor(Qt::darkGray);
+        brush.setColor(fondoPress);
         brush.setStyle(Qt::SolidPattern);
         paint.setBrush(brush);
-        paint.drawRect(w*2/5-radio,botonHigh,60,60);
+        paint.drawRect(w*2/5-30,botonHigh,60,60);
         //Set & Draw circulo
         pen.setWidth(3);
-        pen.setColor(Qt::black);
+        pen.setColor(contorno);
         paint.setPen(pen);
-        brush.setColor(Qt::gray);
+        brush.setColor(circuloPress);
         brush.setStyle(Qt::SolidPattern);
         paint.setBrush(brush);
-        paint.drawEllipse(w*2/5-5,botonHigh+15,30,30);
+        paint.drawEllipse(w*2/5-15,botonHigh+15,30,30);
     }else{
         //Set & Draw cuadrado
         pen.setWidth(3);
-        pen.setColor(Qt::black);
+        pen.setColor(contorno);
         paint.setPen(pen);
-        brush.setColor(Qt::gray);
+        brush.setColor(fondoNotPress);
         brush.setStyle(Qt::SolidPattern);
         paint.setBrush(brush);
-        paint.drawRect(w*2/5-radio,botonHigh,60,60);
+        paint.drawRect(w*2/5-30,botonHigh,60,60);
         //Set & Draw circulo
         pen.setWidth(3);
-        pen.setColor(Qt::black);
+        pen.setColor(contorno);
         paint.setPen(pen);
-        brush.setColor(Qt::darkGray);
+        brush.setColor(circuloNotPress);
         brush.setStyle(Qt::SolidPattern);
         paint.setBrush(brush);
-        paint.drawEllipse(w*2/5-5,botonHigh+15,30,30);
+        paint.drawEllipse(w*2/5-15,botonHigh+15,30,30);
     }
 
-    if (botonSelect & 0x08){
+    if (botones.numButton & 0x08){
         //Set & Draw cuadrado
         pen.setWidth(3);
-        pen.setColor(Qt::black);
+        pen.setColor(contorno);
         paint.setPen(pen);
-        brush.setColor(Qt::darkGray);
+        brush.setColor(fondoPress);
         brush.setStyle(Qt::SolidPattern);
         paint.setBrush(brush);
-        paint.drawRect(w*1/5-radio,botonHigh,60,60);
+        paint.drawRect(w*1/5-30,botonHigh,60,60);
         //Set & Draw circulo
         pen.setWidth(3);
-        pen.setColor(Qt::black);
+        pen.setColor(contorno);
         paint.setPen(pen);
-        brush.setColor(Qt::gray);
+        brush.setColor(circuloPress);
         brush.setStyle(Qt::SolidPattern);
         paint.setBrush(brush);
-        paint.drawEllipse(w*1/5-5,botonHigh+15,30,30);
+        paint.drawEllipse(w*1/5-15,botonHigh+15,30,30);
     }else{
         //Set & Draw cuadrado
         pen.setWidth(3);
-        pen.setColor(Qt::black);
+        pen.setColor(contorno);
         paint.setPen(pen);
-        brush.setColor(Qt::gray);
+        brush.setColor(fondoNotPress);
         brush.setStyle(Qt::SolidPattern);
         paint.setBrush(brush);
-        paint.drawRect(w*1/5-radio,botonHigh,60,60);
+        paint.drawRect(w*1/5-30,botonHigh,60,60);
         //Set & Draw circulo
         pen.setWidth(3);
-        pen.setColor(Qt::black);
+        pen.setColor(contorno);
         paint.setPen(pen);
-        brush.setColor(Qt::darkGray);
+        brush.setColor(circuloNotPress);
         brush.setStyle(Qt::SolidPattern);
         paint.setBrush(brush);
-        paint.drawEllipse(w*1/5-5,botonHigh+15,30,30);
+        paint.drawEllipse(w*1/5-15,botonHigh+15,30,30);
     }
 
     QPaintBox1->update();

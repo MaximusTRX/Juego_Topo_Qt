@@ -46,7 +46,7 @@ private slots:
 
     void on_checkBox_3_toggled(bool checked);
 
-    void ledsPrint();
+    void leds_botons_Print();
 
 private:
     Ui::MainWindow *ui;
@@ -83,7 +83,20 @@ private:
         OTHERS
     }_eID;
 
+    typedef enum{
+        BUTTON_DOWN,    //0
+        BUTTON_UP,      //1
+        BUTTON_FALLING, //2
+        BUTTON_RISING   //3
+    }_eButtonState;
+
+    typedef struct{
+        uint8_t numButton;
+        uint8_t flanco;
+        uint32_t timerRead;
+    }_sSendBotones;
+    _sSendBotones botones;
+
     uint16_t ledSelect=0;
-    uint16_t botonSelect=0;
 };
 #endif // MAINWINDOW_H
