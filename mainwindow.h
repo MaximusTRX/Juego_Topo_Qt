@@ -42,11 +42,15 @@ private slots:
 
     void decodeData();
 
+    void encodeData(uint8_t id);
+
     void on_encodeData_clicked();
 
     void on_checkBox_3_toggled(bool checked);
 
     void leds_botons_Print();
+
+    void inGame();
 
 private:
     Ui::MainWindow *ui;
@@ -91,12 +95,32 @@ private:
     }_eButtonState;
 
     typedef struct{
-        uint8_t numButton;
+        uint16_t numButton;
         uint8_t flanco;
         uint32_t timerRead;
     }_sSendBotones;
     _sSendBotones botones;
 
     uint16_t ledSelect=0;
+
+    typedef enum{
+        WAITING,
+        IN_GAME,
+        LOSE,
+    }_eGAMESTATES;
+
+    typedef struct _sGame{
+        uint8_t state=0;
+        uint16_t time=0;
+    }_sGame;
+    _sGame game;
+
+    typedef struct{
+        uint8_t numLed;
+        uint8_t state;
+        uint16_t timeWait;
+        uint16_t timeOut;
+    }_sled;
+    _sled led;
 };
 #endif // MAINWINDOW_H

@@ -29,12 +29,15 @@ MainWindow::MainWindow(QWidget *parent)
 
     ui->comboBox->addItem("ALIVE", 0xF0);
     ui->comboBox->addItem("Get Leds", 0xFB);
+    ui->comboBox->addItem("Set Leds", 0xFC);
 
     ui->encodeData->setEnabled(false);
     ui->plainTextEdit->setVisible(false);
 
-    ui->toolBar->addAction("Debugging");
+//    ui->toolBar->addAction("Debugging");
 //    ui->addWidget(QToolButton);
+    connect(ui->actionExit,&QAction::triggered,this,&MainWindow::close);
+
     setWindowTitle("Hola");
 
     QTimer1->start(50);
@@ -53,6 +56,7 @@ void MainWindow::onQTimer1(){
         if(!timeoutRx)
             header = 0;
     }
+    game.time++;
 }
 
 void MainWindow::on_pushButton_3_clicked(){
@@ -66,7 +70,7 @@ void MainWindow::on_pushButton_3_clicked(){
             ui->encodeData->setEnabled(true);
             ui->pushButton_3->setText("CLOSE");
             //Pregunto version del firmware
-            ID = GET_LEDS;
+            ID = ALIVE;
             length = 0;
             sendData();
         }else{
@@ -159,56 +163,11 @@ void MainWindow::onQSerialPort1Rx(){
     delete [] buf;
 }
 
-void MainWindow::decodeData(){
-    strRxProcess = "Powered by Maxi----Version: 0x";
-
-    switch (bufRX[0]) {
-    case 0x11:
-        ui->plainTextEdit->appendPlainText(QString("%1").arg(bufRX[1], 2, 16, QChar('0')).toUpper());
-        break;
-
-    case FIRMWARE:
-        strRxProcess += QString("%1").arg(bufRX[1], 2, 16, QChar('0')).toUpper();
-        ui->statusbar->showMessage(strRxProcess);
-        setWindowTitle(strRxProcess);
-        break;
-
-    case GET_LEDS:
-        myWord.ui16[0] = bufRX[1];
-        myWord.ui16[1] = bufRX[2];
-        ledSelect = myWord.ui32;
-        strRxProcess = QString("%1").arg(myWord.ui32, 2, 16, QChar('0')).toUpper();
-        ui->plainTextEdit->appendPlainText(strRxProcess);
-        leds_botons_Print();
-        break;
-
-    case CHANGE_BOTONES:
-        botones.numButton = bufRX[1];
-        botones.flanco = bufRX[2];
-
-        myWord.ui8[0] = bufRX[3];
-        myWord.ui8[0] = bufRX[4];
-        myWord.ui8[0] = bufRX[5];
-        myWord.ui8[0] = bufRX[6];
-        botones.timerRead = myWord.ui32;
-
-        ui->lcdNumber->display(QString("%1").arg(botones.timerRead, 2, 10, QChar('0')));
-        strRxProcess = QString("%1").arg(myWord.ui32, 2, 16, QChar('0')).toUpper();
-        ui->plainTextEdit->appendPlainText(strRxProcess);
-        leds_botons_Print();
-    }
-}
-
-void MainWindow::on_encodeData_clicked()
-{
-    uint8_t cmd;
+void MainWindow::encodeData(uint8_t id){
     bool readyToSend = false;
 
-    cmd = ui->comboBox->currentData().toInt();
 
-    ui->plainTextEdit->appendPlainText(QString("%1").arg(cmd, 2, 16, QChar('0')).toUpper());
-
-    switch (cmd) {
+    switch (id) {
     case ALIVE:
         ID = ALIVE;
         length = 0;
@@ -220,12 +179,149 @@ void MainWindow::on_encodeData_clicked()
         length = 0;
         readyToSend = true;
         break;
+
+    case SET_LEDS:
+        ID = SET_LEDS;
+        length = 2;
+        readyToSend = true;
+
+        if (ui->radioButton->isChecked()){
+            led.numLed = 4;
+        }
+        if (ui->radioButton_2->isChecked()){
+            led.numLed = 3;
+        }
+        if (ui->radioButton_3->isChecked()){
+            led.numLed = 2;
+        }
+        if (ui->radioButton_4->isChecked()){
+            led.numLed = 1;
+        }
+
+        if (ui->radioButton_5->isChecked()){
+            led.state = 1;
+        }else if (ui->radioButton_6->isChecked()){
+            led.state = 0;
+        }
+
+        switch (led.state) {
+        case 0:
+            payLoad[1]=0x00;
+            switch (led.numLed) {
+            case 1:
+                payLoad[0] = 0x00;
+                break;
+            case 2:
+                payLoad[0] = 0x01;
+                break;
+            case 3:
+                payLoad[0] = 0x02;
+                break;
+            case 4:
+                payLoad[0] = 0x03;
+                break;
+            }
+            break;
+
+        case 1:
+            payLoad[1]=0x01;
+            switch (led.numLed) {
+            case 1:
+                payLoad[0] = 0x00;
+                break;
+            case 2:
+                payLoad[0] = 0x01;
+                break;
+            case 3:
+                payLoad[0] = 0x02;
+                break;
+            case 4:
+                payLoad[0] = 0x03;
+                break;
+            }
+            break;
+        }
+
+
+        break;
     }
 
     if (readyToSend)
     {
         sendData();
     }
+}
+
+void MainWindow::decodeData(){
+    strRxProcess = "Powered by Maxi----Version: 0x";
+
+    switch (bufRX[0]) {
+    case 0x11:
+        ui->plainTextEdit->appendPlainText(QString("%1").arg(bufRX[1], 2, 16, QChar('0')).toUpper());
+        break;
+
+    case ALIVE:
+//        strRxProcess += QString("%1").arg(bufRX[1], 2, 16, QChar('0')).toUpper();
+//        ui->statusbar->showMessage(strRxProcess);
+//        setWindowTitle(strRxProcess);
+        ID = GET_LEDS;
+        length = 0;
+        sendData();
+        break;
+
+    case GET_LEDS:
+        myWord.ui16[0] = bufRX[1];
+        myWord.ui16[1] = bufRX[2];
+        ledSelect = myWord.ui32;
+        strRxProcess = QString("%1").arg(myWord.ui32, 2, 16, QChar('0')).toUpper();
+        ui->plainTextEdit->appendPlainText(strRxProcess);
+        leds_botons_Print();
+
+        ID = GET_BOTONES;
+        length = 0;
+        sendData();
+        break;
+
+    case GET_BOTONES:
+        myWord.ui16[0] = bufRX[1];
+        myWord.ui16[1] = bufRX[2];
+        botones.numButton = ~myWord.ui32;
+
+        strRxProcess = QString("%1").arg(myWord.ui32, 2, 16, QChar('0')).toUpper();
+        ui->plainTextEdit->appendPlainText(strRxProcess);
+        leds_botons_Print();
+        ui->lcdNumber_4->display("32");
+
+        break;
+
+    case CHANGE_BOTONES:
+        botones.numButton = bufRX[1];
+        botones.flanco = bufRX[2];
+
+        myWord.ui8[0] = bufRX[3];
+        myWord.ui8[1] = bufRX[4];
+        myWord.ui8[2] = bufRX[5];
+        myWord.ui8[3] = bufRX[6];
+
+        if (botones.flanco == BUTTON_FALLING){
+            botones.timerRead = myWord.ui32;
+        }else{
+            botones.timerRead = myWord.ui32 - botones.timerRead;
+            ui->plainTextEdit->appendPlainText(QString("%1").arg(botones.timerRead, 4, 10, QChar('0')));
+        }
+        leds_botons_Print();
+    }
+    inGame();
+}
+
+void MainWindow::on_encodeData_clicked()
+{
+    uint8_t cmd;
+    cmd = ui->comboBox->currentData().toInt();
+
+    ui->plainTextEdit->appendPlainText(QString("%1").arg(cmd, 2, 16, QChar('0')).toUpper());
+
+    encodeData(cmd);
 }
 
 void MainWindow::sendData()
@@ -391,7 +487,7 @@ void MainWindow::leds_botons_Print()
     paint.drawText(w*3/5-radio-15,botonHigh-radio-10, "Boton_3");
     paint.drawText(w*2/5-radio-15,botonHigh-radio-10, "Boton_2");
     paint.drawText(w*1/5-radio-15,botonHigh-radio-10, "Boton_1");
-    //    paint.drawRoundedRect(w*4/5-radio,h/2-radio,20,20,40);
+//    paint.drawRoundedRect(w*4/5-radio,h/2-radio,20,20,12,5);
 
     QColor contorno = Qt::black;
     QColor fondoNotPress = Qt::gray;
@@ -407,7 +503,8 @@ void MainWindow::leds_botons_Print()
         brush.setColor(fondoPress);
         brush.setStyle(Qt::SolidPattern);
         paint.setBrush(brush);
-        paint.drawRect(w*4/5-30,botonHigh,60,60);
+        paint.drawRoundedRect(w*4/5-30,botonHigh,60,60,12,5);
+//        paint.drawRect(w*4/5-30,botonHigh,60,60);
         //Set & Draw circulo
         pen.setWidth(3);
         pen.setColor(contorno);
@@ -424,7 +521,8 @@ void MainWindow::leds_botons_Print()
         brush.setColor(fondoNotPress);
         brush.setStyle(Qt::SolidPattern);
         paint.setBrush(brush);
-        paint.drawRect(w*4/5-30,botonHigh,60,60);
+//        paint.drawRect(w*4/5-30,botonHigh,60,60);
+        paint.drawRoundedRect(w*4/5-30,botonHigh,60,60,12,5);
         //Set & Draw circulo
         pen.setWidth(3);
         pen.setColor(contorno);
@@ -443,7 +541,8 @@ void MainWindow::leds_botons_Print()
         brush.setColor(fondoPress);
         brush.setStyle(Qt::SolidPattern);
         paint.setBrush(brush);
-        paint.drawRect(w*3/5-30,botonHigh,60,60);
+//        paint.drawRect(w*3/5-30,botonHigh,60,60);
+        paint.drawRoundedRect(w*3/5-30,botonHigh,60,60,12,5);
         //Set & Draw circulo
         pen.setWidth(3);
         pen.setColor(contorno);
@@ -460,7 +559,8 @@ void MainWindow::leds_botons_Print()
         brush.setColor(fondoNotPress);
         brush.setStyle(Qt::SolidPattern);
         paint.setBrush(brush);
-        paint.drawRect(w*3/5-30,botonHigh,60,60);
+//        paint.drawRect(w*3/5-30,botonHigh,60,60);
+        paint.drawRoundedRect(w*3/5-30,botonHigh,60,60,12,5);
         //Set & Draw circulo
         pen.setWidth(3);
         pen.setColor(contorno);
@@ -479,7 +579,9 @@ void MainWindow::leds_botons_Print()
         brush.setColor(fondoPress);
         brush.setStyle(Qt::SolidPattern);
         paint.setBrush(brush);
-        paint.drawRect(w*2/5-30,botonHigh,60,60);
+//        paint.drawRect(w*2/5-30,botonHigh,60,60);
+        paint.drawRoundedRect(w*2/5-30,botonHigh,60,60,12,5);
+
         //Set & Draw circulo
         pen.setWidth(3);
         pen.setColor(contorno);
@@ -496,7 +598,8 @@ void MainWindow::leds_botons_Print()
         brush.setColor(fondoNotPress);
         brush.setStyle(Qt::SolidPattern);
         paint.setBrush(brush);
-        paint.drawRect(w*2/5-30,botonHigh,60,60);
+//        paint.drawRect(w*2/5-30,botonHigh,60,60);
+        paint.drawRoundedRect(w*2/5-30,botonHigh,60,60,12,5);
         //Set & Draw circulo
         pen.setWidth(3);
         pen.setColor(contorno);
@@ -515,7 +618,8 @@ void MainWindow::leds_botons_Print()
         brush.setColor(fondoPress);
         brush.setStyle(Qt::SolidPattern);
         paint.setBrush(brush);
-        paint.drawRect(w*1/5-30,botonHigh,60,60);
+//        paint.drawRect(w*1/5-30,botonHigh,60,60);
+        paint.drawRoundedRect(w*1/5-30,botonHigh,60,60,12,5);
         //Set & Draw circulo
         pen.setWidth(3);
         pen.setColor(contorno);
@@ -532,7 +636,8 @@ void MainWindow::leds_botons_Print()
         brush.setColor(fondoNotPress);
         brush.setStyle(Qt::SolidPattern);
         paint.setBrush(brush);
-        paint.drawRect(w*1/5-30,botonHigh,60,60);
+//        paint.drawRect(w*1/5-30,botonHigh,60,60);
+        paint.drawRoundedRect(w*1/5-30,botonHigh,60,60,12,5);
         //Set & Draw circulo
         pen.setWidth(3);
         pen.setColor(contorno);
@@ -546,3 +651,29 @@ void MainWindow::leds_botons_Print()
     QPaintBox1->update();
 }
 
+void MainWindow::inGame(){
+//    switch (game.state) {
+//    case WAITING:
+//        if (botones.timerRead >= 1000){
+//            game.state = IN_GAME;
+//            game.time = 0;
+//        }
+//        break;
+
+//    case IN_GAME:
+//        srand(time(NULL));
+
+//        if (game.time >=600){
+//            game.state=LOSE;
+//        }
+//        //El juego inicia
+//        for (int i=0; i<=4; i++) {
+//            led.timeWait = rand() % (5001+1000);
+//            led.timeOut = rand() % (1501+500);
+//            on_encodeData_clicked();
+//        }
+
+//        break;
+
+//    }
+}
