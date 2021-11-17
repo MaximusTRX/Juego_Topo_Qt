@@ -57,6 +57,7 @@ void MainWindow::onQTimer1(){
             header = 0;
     }
     game.time++;
+//    inGame();
 }
 
 void MainWindow::on_pushButton_3_clicked(){
@@ -185,6 +186,7 @@ void MainWindow::encodeData(uint8_t id){
         length = 2;
         readyToSend = true;
 
+        ui->plainTextEdit->appendPlainText("------SET LEDS-----");
         if (ui->radioButton->isChecked()){
             led.numLed = 4;
         }
@@ -199,14 +201,14 @@ void MainWindow::encodeData(uint8_t id){
         }
 
         if (ui->radioButton_5->isChecked()){
-            led.state = 1;
+            led.state[led.numLed] = 1;
         }else if (ui->radioButton_6->isChecked()){
-            led.state = 0;
+            led.state[led.numLed] = 0;
         }
 
-        switch (led.state) {
+        switch (led.state[led.numLed]) {
         case 0:
-            payLoad[1]=0x00;
+            payLoad[1]=0x01;
             switch (led.numLed) {
             case 1:
                 payLoad[0] = 0x00;
@@ -224,7 +226,7 @@ void MainWindow::encodeData(uint8_t id){
             break;
 
         case 1:
-            payLoad[1]=0x01;
+            payLoad[1]=0x00;
             switch (led.numLed) {
             case 1:
                 payLoad[0] = 0x00;
@@ -241,8 +243,6 @@ void MainWindow::encodeData(uint8_t id){
             }
             break;
         }
-
-
         break;
     }
 
@@ -269,19 +269,6 @@ void MainWindow::decodeData(){
         sendData();
         break;
 
-    case GET_LEDS:
-        myWord.ui16[0] = bufRX[1];
-        myWord.ui16[1] = bufRX[2];
-        ledSelect = myWord.ui32;
-        strRxProcess = QString("%1").arg(myWord.ui32, 2, 16, QChar('0')).toUpper();
-        ui->plainTextEdit->appendPlainText(strRxProcess);
-        leds_botons_Print();
-
-        ID = GET_BOTONES;
-        length = 0;
-        sendData();
-        break;
-
     case GET_BOTONES:
         myWord.ui16[0] = bufRX[1];
         myWord.ui16[1] = bufRX[2];
@@ -292,6 +279,18 @@ void MainWindow::decodeData(){
         leds_botons_Print();
         ui->lcdNumber_4->display("32");
 
+        ID = GET_LEDS;
+        length = 0;
+        sendData();
+        break;
+
+    case GET_LEDS:
+        myWord.ui16[0] = bufRX[1];
+        myWord.ui16[1] = bufRX[2];
+        ledSelect = myWord.ui32;
+        strRxProcess = QString("%1").arg(myWord.ui32, 2, 16, QChar('0')).toUpper();
+        ui->plainTextEdit->appendPlainText(strRxProcess);
+        leds_botons_Print();
         break;
 
     case CHANGE_BOTONES:
@@ -304,12 +303,14 @@ void MainWindow::decodeData(){
         myWord.ui8[3] = bufRX[6];
 
         if (botones.flanco == BUTTON_FALLING){
+            botones.timePress = 0;
             botones.timerRead = myWord.ui32;
         }else{
-            botones.timerRead = myWord.ui32 - botones.timerRead;
-            ui->plainTextEdit->appendPlainText(QString("%1").arg(botones.timerRead, 4, 10, QChar('0')));
+            botones.timePress = myWord.ui32 - botones.timerRead;
+            ui->plainTextEdit->appendPlainText(QString("%1").arg(botones.timePress, 4, 10, QChar('0')));
         }
         leds_botons_Print();
+        break;
     }
     inGame();
 }
@@ -652,28 +653,78 @@ void MainWindow::leds_botons_Print()
 }
 
 void MainWindow::inGame(){
-//    switch (game.state) {
-//    case WAITING:
-//        if (botones.timerRead >= 1000){
-//            game.state = IN_GAME;
-//            game.time = 0;
-//        }
-//        break;
 
-//    case IN_GAME:
-//        srand(time(NULL));
+    if (game.time >= 600)
+        game.state = LOSE;
 
-//        if (game.time >=600){
-//            game.state=LOSE;
-//        }
-//        //El juego inicia
-//        for (int i=0; i<=4; i++) {
-//            led.timeWait = rand() % (5001+1000);
-//            led.timeOut = rand() % (1501+500);
-//            on_encodeData_clicked();
-//        }
+    switch (game.state){
+    case WAITING:
+        ui->plainTextEdit->appendPlainText("------GAME WAITING-----");
+        if (botones.timePress >= 1000){
+            game.state = IN_GAME;
+            game.time = 0;
+            for (led.numLed=0; led.numLed<4; led.numLed++){
+                ui->plainTextEdit->appendPlainText(QString("%1").arg(led.numLed, 4, 10, QChar('0')));
+                led.isOut[led.numLed]=0;
+                led.state[led.numLed]=0;
+                led.timeOut[led.numLed]=0;
+                led.timeWait[led.numLed]=0;
+                encodeData(SET_LEDS);
+            }
+        }
+        break;
 
-//        break;
+    case IN_GAME:
+        ui->plainTextEdit->appendPlainText("------IN GAME-----");
 
-//    }
+        srand(time(NULL));
+
+        if (game.time >=600){
+            game.state=LOSE;
+        }
+        //El juego inicia
+        for (led.numLed=0; led.numLed<4; led.numLed++) {
+            if (led.state[led.numLed]){
+                if (led.isOut[led.numLed])
+                {
+                    if (led.timeOut[led.numLed] <= game.time)
+                    {
+                        led.state[led.numLed] = 0;
+                        led.isOut[led.numLed] = 0;
+                        game.puntaje -= 10;
+                        encodeData(SET_LEDS);
+                    }
+                }else{
+                    if (game.time >= led.timeWait[led.numLed]){
+                        led.isOut[led.numLed] = 1;
+                        encodeData(SET_LEDS);
+                    }
+                }
+            }else{
+                if(led.timeWait[led.numLed] == 0)
+                {
+                    randLedGen(led.numLed);
+                    led.state[led.numLed] = 1;
+                }
+            }
+        }
+
+        break;
+
+    case LOSE:
+        ui->plainTextEdit->appendPlainText("------GAME LOSE-----");
+        for (led.numLed = 0; led.numLed<4; led.numLed++) {
+            led.isOut[led.numLed] = 0;
+            led.state[led.numLed] = 0;
+            encodeData(SET_LEDS);
+            game.state = WAITING;
+        }
+        break;
+
+    }
+}
+
+void MainWindow::randLedGen(uint8_t indice){
+    led.timeWait[indice] = rand() % (5001+1000) + game.time;
+    led.timeOut[indice] = rand() % (1501+500) + game.time;
 }

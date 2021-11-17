@@ -52,6 +52,8 @@ private slots:
 
     void inGame();
 
+    void randLedGen(uint8_t indice);
+
 private:
     Ui::MainWindow *ui;
 
@@ -94,10 +96,11 @@ private:
         BUTTON_RISING   //3
     }_eButtonState;
 
-    typedef struct{
+    typedef struct _sSendBotones{
         uint16_t numButton;
         uint8_t flanco;
         uint32_t timerRead;
+        uint32_t timePress=0;
     }_sSendBotones;
     _sSendBotones botones;
 
@@ -112,15 +115,18 @@ private:
     typedef struct _sGame{
         uint8_t state=0;
         uint16_t time=0;
+        int32_t puntaje;
     }_sGame;
     _sGame game;
 
     typedef struct{
         uint8_t numLed;
-        uint8_t state;
-        uint16_t timeWait;
-        uint16_t timeOut;
+        uint8_t state[4];
+        uint8_t isOut[4];
+        uint16_t timeWait[4];
+        uint16_t timeOut[4];
     }_sled;
     _sled led;
+    uint8_t mask[4] = {0x01, 0x01, 0x04, 0x08};
 };
 #endif // MAINWINDOW_H
